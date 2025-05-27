@@ -4,6 +4,7 @@ import { z } from "zod";
 config();
 
 export const EnvSchema = z.object({
+  SECRET_KEY: z.string(),
   DISCORD_BOT_TOKEN: z.string(),
   PORT: z.string().default("3000").transform(Number),
   ERROR_CHANNEL_ID: z.string(),
