@@ -7,6 +7,7 @@ export const EnvSchema = z.object({
   DISCORD_BOT_TOKEN: z.string(),
   PORT: z.string().default("3000").transform(Number),
   ERROR_CHANNEL_ID: z.string(),
+  FEEDBACK_CHANNEL_ID: z.string(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

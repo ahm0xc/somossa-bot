@@ -38,6 +38,17 @@ const logErrorPayloadSchema = z.object({
   url: z.string().url().optional(),
 });
 
+const feedbackSchema = z.object({
+  appName: z.string(),
+  name: z.string().optional(),
+  email: z.string().email().optional(),
+  message: z.string().min(1, "Feedback message cannot be empty"),
+  rating: z.number().min(1).max(5).optional(),
+  source: z.string().optional(),
+  timestamp: z.string().datetime().default(() => new Date().toISOString()),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
 app.post("/log", async (c) => {
   const channel = client.channels.cache.get(env.ERROR_CHANNEL_ID);
   if (!channel)
@@ -87,6 +98,62 @@ app.post("/log", async (c) => {
 
   if (payload.url) {
     embed.fields.push({ name: "URL", value: payload.url, inline: false });
+  }
+
+  await channel.send({ embeds: [embed] });
+
+  return c.json({ status: "ok" });
+});
+
+app.post("/feedback", async (c) => {
+  const channel = client.channels.cache.get(env.FEEDBACK_CHANNEL_ID);
+  if (!channel)
+    return c.json({ status: "error", message: "Feedback channel not found" }, 500);
+
+  if (!(channel instanceof TextChannel)) {
+    return c.json(
+      { status: "error", message: "Channel is not a TextChannel" },
+      500
+    );
+  }
+
+  const unsafeBody = await c.req.json();
+  const bodyResult = feedbackSchema.safeParse(unsafeBody);
+  if (bodyResult.error)
+    return c.json({ status: "error", message: bodyResult.error.message }, 400);
+  
+  const feedback = bodyResult.data;
+
+  const stars = feedback.rating ? "⭐".repeat(feedback.rating) : "";
+  
+  const embed = {
+    color: 0x4CAF50,
+    title: `📝 New Feedback from **${feedback.appName}** ${stars}`,
+    description: feedback.message,
+    fields: [] as { name: string; value: string; inline?: boolean }[],
+    timestamp: feedback.timestamp,
+  };
+
+  embed.fields.push({ name: "Application", value: `**${feedback.appName}**`, inline: true });
+
+  if (feedback.name) {
+    embed.fields.push({ name: "Name", value: feedback.name, inline: true });
+  }
+
+  if (feedback.email) {
+    embed.fields.push({ name: "Email", value: feedback.email, inline: true });
+  }
+
+  if (feedback.source) {
+    embed.fields.push({ name: "Source", value: feedback.source, inline: true });
+  }
+
+  if (feedback.metadata && Object.keys(feedback.metadata).length > 0) {
+    embed.fields.push({ 
+      name: "Additional Information", 
+      value: `\`\`\`json\n${JSON.stringify(feedback.metadata, null, 2).slice(0, 1000)}\n\`\`\``,
+      inline: false
+    });
   }
 
   await channel.send({ embeds: [embed] });
